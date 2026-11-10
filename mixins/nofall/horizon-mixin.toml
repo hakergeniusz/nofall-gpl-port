@@ -1,0 +1,93 @@
+[mod]
+id = "nofall"
+version = "0.1.0"
+priority = 100
+
+# The commit it was tested on: it patches the client's motion and landing
+# sources directly (and the game's mod hooks), so a Horizon change there
+# needs a re-check.
+[compatibility]
+horizon_revision = "2ebf00a0281c592f79191e76fce0e7d522c6f425"
+
+# The mod's brain: pure standard library, no game types, tested on its own.
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "nofall"
+source = "runtime.rs"
+
+# The gate the landing reads: which entity ids are the mod's to protect.
+# It lives with the landing, which the game's state cannot reach (the
+# client's game module is a different crate than landing's), and the game
+# side reaches it only through `pub`.
+[[module]]
+id = "gate"
+file = "crates/horizon-client/src/landing.rs"
+name = "nofall_gate"
+source = "gate.rs"
+visibility = "pub"
+
+# A living entity's fall, where the game asks its mods for a cancellation:
+# the game's own hook for exactly this hurt (`native_living_fall`). A
+# cancel keeps the whole landing — physics, sounds of the blocks, the fall
+# distance — and drops only the damage. The entity id and kind decide:
+# only a `minecraft:player` whose id a window wrote is canceled, so mobs,
+# LAN guests and dedicated servers' players pass untouched.
+[[injection]]
+id = "fall"
+kind = "HEAD"
+target = "horizon_client::landing::native_living_fall"
+helper = "fall.rs"
+bindings = [
+  { name = "entity", ty = "u32", value = "entity" },
+  { name = "kind", ty = "&str", value = "kind" },
+  { name = "cancel", ty = "&mut bool", value = "&mut *cancel" },
+]
+
+# Once a tick, in every Game: the window's writes the gate with its local
+# player's entity id (from `Remote.entity_id`, the id the server-side sims
+# carry) while the mod is on; the server's Games — a dedicated server's
+# and the single-player server thread's — never write, so nobody's falls
+# are canceled but the windows' own players'.
+[[injection]]
+id = "tick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tick"
+helper = "tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# The row in Options > Mods, with the mod's description.
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
+
+# The settings page: the one Enabled row, in the state the file holds.
+[[injection]]
+id = "settings"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings"
+helper = "settings.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "buttons", ty = "&mut Vec<String>", value = "&mut *buttons" },
+]
+
+# A click on the settings page, stored for the next tick to read.
+[[injection]]
+id = "click"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings_click"
+helper = "click.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "button", ty = "usize", value = "button" },
+]

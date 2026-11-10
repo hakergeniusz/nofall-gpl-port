@@ -1,0 +1,12 @@
+[package]
+name = "horizon-nofall"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+description = "Attempts to prevent you from taking fall damage: a Horizon native mod port of Meteor Client's NoFall."
+publish = false
+
+# The runtime doubles as the mod's library (its tests) and the module the
+# bundle injects into the game; the helper files compile only inside it.
+[lib]
+path = "mixins/nofall/runtime.rs"
